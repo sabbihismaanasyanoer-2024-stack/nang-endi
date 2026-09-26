@@ -22,5 +22,5 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Permission writable CodeIgniter
 RUN chown -R www-data:www-data /app/writable
 
-# Jalankan FrankenPHP sebagai HTTP server
+# Jalankan FrankenPHP pada port Vercel
 CMD ["sh", "-c", "frankenphp php-server --root /app/public --listen 0.0.0.0:${PORT}"]
