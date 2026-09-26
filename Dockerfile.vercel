@@ -2,16 +2,25 @@ FROM dunglas/frankenphp:php8.3
 
 WORKDIR /app
 
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# PHP extensions yang dibutuhkan CodeIgniter
 RUN install-php-extensions \
     intl \
     mbstring \
     mysqli \
-    pdo_mysql
+    pdo_mysql \
+    zip
 
+# Copy seluruh project
 COPY . .
 
-RUN composer install --no-dev --optimize-autoloader
+# Install dependency PHP
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
+# Permission writable CodeIgniter
 RUN chown -R www-data:www-data /app/writable
 
+# Jalankan FrankenPHP pada port Vercel
 CMD ["sh", "-c", "frankenphp php-server --root /app/public --listen 0.0.0.0:${PORT}"]
