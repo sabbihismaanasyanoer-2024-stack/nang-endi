@@ -1,0 +1,17 @@
+FROM dunglas/frankenphp:php8.3
+
+WORKDIR /app
+
+RUN install-php-extensions \
+    intl \
+    mbstring \
+    mysqli \
+    pdo_mysql
+
+COPY . .
+
+RUN composer install --no-dev --optimize-autoloader
+
+RUN chown -R www-data:www-data /app/writable
+
+CMD ["sh", "-c", "frankenphp php-server --root /app/public --listen 0.0.0.0:${PORT}"]
