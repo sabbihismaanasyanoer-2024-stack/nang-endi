@@ -12,11 +12,22 @@ class AdminAuth implements FilterInterface
         RequestInterface $request,
         $arguments = null
     ) {
-        if (session()->get('is_admin_logged_in') !== true) {
+        $isAdminLoggedIn = session()->get('is_admin_logged_in');
+
+        if (
+            $isAdminLoggedIn !== true &&
+            $isAdminLoggedIn !== 1 &&
+            $isAdminLoggedIn !== '1'
+        ) {
             return redirect()
                 ->to('/admin/login')
-                ->with('error', 'Silakan login sebagai admin terlebih dahulu.');
+                ->with(
+                    'error',
+                    'Sesi admin sudah berakhir. Silakan login kembali.'
+                );
         }
+
+        return null;
     }
 
     public function after(
