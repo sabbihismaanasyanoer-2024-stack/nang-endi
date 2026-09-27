@@ -8,7 +8,7 @@ use App\Models\OrderModel;
 class Checkout extends BaseController
 {
     /**
-     * Halaman checkout event kolaborasi.
+     * Halaman checkout event.
      */
     public function index($slug)
     {
@@ -17,12 +17,11 @@ class Checkout extends BaseController
         $event = $eventModel
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->where('is_partner', 1)
             ->first();
 
         if (!$event) {
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound(
-                'Event kolaborasi tidak ditemukan.'
+                'Event tidak ditemukan.'
             );
         }
 
@@ -55,7 +54,6 @@ class Checkout extends BaseController
         // =========================
 
         if (!$eventId || !$name || !$email || !$phone) {
-
             return redirect()
                 ->back()
                 ->withInput()
@@ -67,7 +65,6 @@ class Checkout extends BaseController
 
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
             return redirect()
                 ->back()
                 ->withInput()
@@ -79,7 +76,6 @@ class Checkout extends BaseController
 
 
         if ($quantity < 1 || $quantity > 10) {
-
             return redirect()
                 ->back()
                 ->withInput()
@@ -87,6 +83,12 @@ class Checkout extends BaseController
                     'error',
                     'Jumlah tiket harus antara 1 sampai 10.'
                 );
+        }
+
+
+        // Saat ini pembayaran menggunakan QRIS.
+        if ($paymentMethod === '') {
+            $paymentMethod = 'qris';
         }
 
 
@@ -98,13 +100,12 @@ class Checkout extends BaseController
 
 
         if (!in_array($paymentMethod, $allowedPayments, true)) {
-
             return redirect()
                 ->back()
                 ->withInput()
                 ->with(
                     'error',
-                    'Silakan pilih metode pembayaran.'
+                    'Metode pembayaran tidak valid.'
                 );
         }
 
@@ -118,14 +119,12 @@ class Checkout extends BaseController
         $event = $eventModel
             ->where('id', $eventId)
             ->where('status', 'published')
-            ->where('is_partner', 1)
             ->first();
 
 
         if (!$event) {
-
             throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound(
-                'Event kolaborasi tidak ditemukan.'
+                'Event tidak ditemukan.'
             );
         }
 
@@ -157,37 +156,35 @@ class Checkout extends BaseController
         $orderModel = new OrderModel();
 
         $orderData = [
-
-            'order_code' => $orderCode,
-
-            'event_id' => $event['id'],
-
-            'buyer_name' => $name,
-
-            'buyer_email' => $email,
-
-            'buyer_phone' => $phone,
-
-            'subtotal' => $total,
-
-            'service_fee' => 0,
-
-            'total_amount' => $total,
-
-            'payment_method' => $paymentMethod,
-
-            'payment_status' => 'waiting_payment',
-
-            'order_status' => 'waiting_payment',
-
+            'order_code'      => $orderCode,
+            'event_id'        => $event['id'],
+            'buyer_name'      => $name,
+            'buyer_email'     => $email,
+            'buyer_phone'     => $phone,
+            'subtotal'        => $total,
+            'service_fee'     => 0,
+            'total_amount'    => $total,
+            'payment_method'  => $paymentMethod,
+            'payment_status'  => 'waiting_payment',
+            'order_status'    => 'waiting_payment',
         ];
 
 
         $orderModel->insert($orderData);
 
 
-        // Ambil ID order yang baru dibuat
         $orderId = $orderModel->getInsertID();
+
+
+        if (!$orderId) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Pesanan gagal dibuat. Silakan coba lagi.'
+                );
+        }
 
 
         // =========================
@@ -195,35 +192,20 @@ class Checkout extends BaseController
         // =========================
 
         $order = [
-
-            'id' => $orderId,
-
-            'order_code' => $orderCode,
-
-            'event_id' => $event['id'],
-
-            'event_title' => $event['title'],
-
-            'event_slug' => $event['slug'],
-
-            'name' => $name,
-
-            'email' => $email,
-
-            'phone' => $phone,
-
-            'quantity' => $quantity,
-
-            'price' => $price,
-
-            'total' => $total,
-
+            'id'             => $orderId,
+            'order_code'     => $orderCode,
+            'event_id'       => $event['id'],
+            'event_title'    => $event['title'],
+            'event_slug'     => $event['slug'],
+            'name'           => $name,
+            'email'          => $email,
+            'phone'          => $phone,
+            'quantity'       => $quantity,
+            'price'          => $price,
+            'total'          => $total,
             'payment_method' => $paymentMethod,
-
-            'status' => 'waiting_payment',
-
-            'created_at' => date('Y-m-d H:i:s'),
-
+            'status'         => 'waiting_payment',
+            'created_at'     => date('Y-m-d H:i:s'),
         ];
 
 
@@ -244,7 +226,7 @@ class Checkout extends BaseController
 
 
     /**
-     * Halaman pembayaran.
+     * Halaman pembayaran QRIS.
      */
     public function payment()
     {
@@ -252,7 +234,6 @@ class Checkout extends BaseController
 
 
         if (!$order) {
-
             return redirect()->to(
                 base_url('events')
             );
@@ -267,6 +248,10 @@ class Checkout extends BaseController
 
     /**
      * Konfirmasi pembayaran.
+     *
+     * Catatan:
+     * Konfirmasi ini merupakan konfirmasi manual dari pengguna.
+     * Sistem belum melakukan verifikasi otomatis ke payment gateway.
      */
     public function confirmPayment()
     {
@@ -274,7 +259,6 @@ class Checkout extends BaseController
 
 
         if (!$order) {
-
             return redirect()->to(
                 base_url('events')
             );
@@ -293,7 +277,7 @@ class Checkout extends BaseController
                 $order['id'],
                 [
                     'payment_status' => 'paid',
-                    'order_status' => 'paid'
+                    'order_status'   => 'paid'
                 ]
             );
         }
@@ -327,7 +311,7 @@ class Checkout extends BaseController
 
 
     /**
-     * Halaman bukti pembayaran / E-Ticket.
+     * Halaman E-Ticket.
      */
     public function success()
     {
@@ -335,7 +319,6 @@ class Checkout extends BaseController
 
 
         if (!$order) {
-
             return redirect()->to(
                 base_url('events')
             );
