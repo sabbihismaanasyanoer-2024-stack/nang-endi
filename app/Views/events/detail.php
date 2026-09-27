@@ -230,16 +230,6 @@
         }
 
 
-        .info-link {
-            text-decoration: underline;
-        }
-
-
-        .info-link:hover {
-            opacity: .65;
-        }
-
-
         .description {
             margin-bottom: 35px;
 
@@ -581,29 +571,44 @@
         <div class="image">
 
             <?php
-                $imagePath = trim($event['image'] ?? '');
+                /*
+                 * Controller sudah menyediakan image_url.
+                 * Kalau belum tersedia, buat ulang dari image
+                 * sebagai fallback.
+                 */
 
-                $imagePath = str_replace(
-                    '\\',
-                    '/',
-                    $imagePath
+                $imageUrl = trim(
+                    $event['image_url'] ?? ''
                 );
 
-                $imagePath = preg_replace(
-                    '#^public/#i',
-                    '',
-                    $imagePath
-                );
+                if ($imageUrl === '') {
 
-                $imagePath = ltrim(
-                    $imagePath,
-                    '/'
-                );
+                    $imagePath = trim(
+                        $event['image'] ?? ''
+                    );
 
-                $imageUrl = '';
+                    $imagePath = str_replace(
+                        '\\',
+                        '/',
+                        $imagePath
+                    );
 
-                if ($imagePath !== '') {
-                    $imageUrl = base_url($imagePath);
+                    $imagePath = preg_replace(
+                        '#^public/#i',
+                        '',
+                        $imagePath
+                    );
+
+                    $imagePath = ltrim(
+                        $imagePath,
+                        '/'
+                    );
+
+                    if ($imagePath !== '') {
+                        $imageUrl = base_url(
+                            $imagePath
+                        );
+                    }
                 }
             ?>
 
@@ -614,7 +619,8 @@
                     src="<?= esc($imageUrl) ?>"
                     alt="<?= esc($event['title'] ?? 'Event') ?>"
                     loading="eager"
-                    onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'image-placeholder\'>🎪</div>';"
+                    decoding="async"
+                    onerror="this.onerror=null;this.style.display='none';"
                 >
 
             <?php else: ?>

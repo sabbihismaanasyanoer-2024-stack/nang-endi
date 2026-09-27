@@ -16,17 +16,10 @@ class Events extends BaseController
             ->orderBy('time_start', 'ASC')
             ->findAll();
 
-        // Pastikan data image tetap tersedia dan format path konsisten
         foreach ($events as &$event) {
-            $image = trim($event['image'] ?? '');
-
-            if ($image !== '') {
-                $image = str_replace('\\', '/', $image);
-                $image = preg_replace('#^/+?#', '', $image);
-                $image = preg_replace('#^public/#i', '', $image);
-            }
-
-            $event['image'] = $image;
+            $event['image_url'] = $this->buildImageUrl(
+                $event['image'] ?? ''
+            );
         }
 
         unset($event);
@@ -51,19 +44,44 @@ class Events extends BaseController
             );
         }
 
-        // Normalisasi path gambar untuk halaman detail
-        $image = trim($event['image'] ?? '');
-
-        if ($image !== '') {
-            $image = str_replace('\\', '/', $image);
-            $image = preg_replace('#^/+?#', '', $image);
-            $image = preg_replace('#^public/#i', '', $image);
-        }
-
-        $event['image'] = $image;
+        $event['image_url'] = $this->buildImageUrl(
+            $event['image'] ?? ''
+        );
 
         return view('events/detail', [
             'event' => $event
         ]);
+    }
+
+    private function buildImageUrl(string $image): string
+    {
+        $image = trim($image);
+
+        if ($image === '') {
+            return '';
+        }
+
+        // Normalisasi slash
+        $image = str_replace('\\', '/', $image);
+
+        // Hilangkan public/ jika tersimpan di database
+        $image = preg_replace(
+            '#^public/#i',
+            '',
+            $image
+        );
+
+        // Hilangkan slash di depan
+        $image = ltrim($image, '/');
+
+        // Kalau ternyata sudah berupa URL lengkap
+        if (
+            str_starts_with($image, 'http://') ||
+            str_starts_with($image, 'https://')
+        ) {
+            return $image;
+        }
+
+        return base_url($image);
     }
 }
