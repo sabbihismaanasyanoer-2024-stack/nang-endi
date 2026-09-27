@@ -29,7 +29,7 @@ class Events extends BaseController
 
 
     /**
-     * Validasi kategori event
+     * Kategori event yang valid
      */
     protected function validCategoryIds(): array
     {
@@ -48,7 +48,7 @@ class Events extends BaseController
 
 
     /**
-     * Daftar semua event
+     * Daftar event
      */
     public function index()
     {
@@ -89,132 +89,235 @@ class Events extends BaseController
         }
 
 
-        $rules = [
-            'category_id' => [
-                'label' => 'Kategori Event',
-                'rules' => 'required|in_list[1,2,3,4,5,6,7,8,16]'
-            ],
+        // =========================
+        // AMBIL INPUT
+        // =========================
 
-            'title' => [
-                'label' => 'Judul Event',
-                'rules' => 'required|max_length[255]'
-            ],
+        $categoryId = (int) $this->request->getPost('category_id');
 
-            'slug' => [
-                'label' => 'Slug',
-                'rules' => 'required|max_length[255]|is_unique[events.slug]'
-            ],
+        $title = trim(
+            (string) $this->request->getPost('title')
+        );
 
-            'date_start' => [
-                'label' => 'Tanggal Mulai',
-                'rules' => 'required'
-            ],
+        $slug = trim(
+            (string) $this->request->getPost('slug')
+        );
 
-            'location_name' => [
-                'label' => 'Lokasi',
-                'rules' => 'required|max_length[255]'
-            ],
+        $dateStart = trim(
+            (string) $this->request->getPost('date_start')
+        );
 
-            'image' => [
-                'label' => 'Gambar Event',
-                'rules' => 'permit_empty|is_image[image]|max_size[image,5120]'
-            ],
+        $locationName = trim(
+            (string) $this->request->getPost('location_name')
+        );
 
-            'status' => [
-                'label' => 'Status',
-                'rules' => 'permit_empty|in_list[draft,published]'
-            ],
-        ];
+        $status = trim(
+            (string) $this->request->getPost('status')
+        );
 
-
-        if (!$this->validate($rules)) {
-            return redirect()
-                ->back()
-                ->withInput()
-                ->with('errors', $this->validator->getErrors());
+        if ($status === '') {
+            $status = 'draft';
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPLOAD GAMBAR
-        |--------------------------------------------------------------------------
-        */
+        // =========================
+        // VALIDASI MANUAL
+        // =========================
 
-        $imagePath = null;
+        $errors = [];
+
+
+        if (!in_array(
+            $categoryId,
+            $this->validCategoryIds(),
+            true
+        )) {
+            $errors['category_id'] =
+                'Kategori event tidak valid.';
+        }
+
+
+        if ($title === '') {
+            $errors['title'] =
+                'Judul event wajib diisi.';
+        } elseif (mb_strlen($title) > 255) {
+            $errors['title'] =
+                'Judul event maksimal 255 karakter.';
+        }
+
+
+        if ($slug === '') {
+            $errors['slug'] =
+                'Slug wajib diisi.';
+        } elseif (mb_strlen($slug) > 255) {
+            $errors['slug'] =
+                'Slug maksimal 255 karakter.';
+        }
+
+
+        if ($dateStart === '') {
+            $errors['date_start'] =
+                'Tanggal mulai wajib diisi.';
+        }
+
+
+        if ($locationName === '') {
+            $errors['location_name'] =
+                'Nama lokasi wajib diisi.';
+        } elseif (mb_strlen($locationName) > 255) {
+            $errors['location_name'] =
+                'Nama lokasi maksimal 255 karakter.';
+        }
+
+
+        if (!in_array(
+            $status,
+            ['draft', 'published'],
+            true
+        )) {
+            $errors['status'] =
+                'Status event tidak valid.';
+        }
+
+
+        // =========================
+        // CEK SLUG DUPLIKAT
+        // =========================
+
+        if ($slug !== '') {
+
+            $existingSlug = $this->eventModel
+                ->where('slug', $slug)
+                ->first();
+
+            if ($existingSlug) {
+                $errors['slug'] =
+                    'Slug tersebut sudah digunakan.';
+            }
+        }
+
+
+        // =========================
+        // VALIDASI GAMBAR
+        // =========================
 
         $image = $this->request->getFile('image');
 
+        if ($image && $image->getError() !== UPLOAD_ERR_NO_FILE) {
 
-        if ($image && $image->isValid() && !$image->hasMoved()) {
+            if (!$image->isValid()) {
+                $errors['image'] =
+                    $image->getErrorString();
+            } else {
 
-            $uploadPath = FCPATH . 'uploads/events/';
+                $allowedExtensions = [
+                    'jpg',
+                    'jpeg',
+                    'png',
+                    'webp',
+                    'gif'
+                ];
+
+                $extension =
+                    strtolower(
+                        $image->getClientExtension()
+                    );
+
+                if (!in_array(
+                    $extension,
+                    $allowedExtensions,
+                    true
+                )) {
+                    $errors['image'] =
+                        'Format gambar harus JPG, JPEG, PNG, WEBP, atau GIF.';
+                }
 
 
-            if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0777, true);
+                if ($image->getSizeByUnit('mb') > 5) {
+                    $errors['image'] =
+                        'Ukuran gambar maksimal 5 MB.';
+                }
+
+
+                if (!in_array(
+                    $image->getMimeType(),
+                    [
+                        'image/jpeg',
+                        'image/png',
+                        'image/webp',
+                        'image/gif'
+                    ],
+                    true
+                )) {
+                    $errors['image'] =
+                        'File yang dipilih bukan gambar yang valid.';
+                }
             }
-
-
-            $newName = $image->getRandomName();
-
-
-            $image->move(
-                $uploadPath,
-                $newName
-            );
-
-
-            $imagePath = 'uploads/events/' . $newName;
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | DATA EVENT
-        |--------------------------------------------------------------------------
-        */
+        // =========================
+        // JIKA ADA ERROR
+        // =========================
+
+        if (!empty($errors)) {
+
+            return redirect()
+                ->to(site_url('admin/events/create'))
+                ->withInput()
+                ->with('errors', $errors);
+        }
+
+
+        // =========================
+        // DATA EVENT
+        // =========================
 
         $data = [
 
             'category_id' =>
-                (int) $this->request->getPost('category_id'),
+                $categoryId,
 
             'title' =>
-                trim($this->request->getPost('title')),
+                $title,
 
             'slug' =>
-                trim($this->request->getPost('slug')),
+                $slug,
 
             'description' =>
-                $this->request->getPost('description'),
+                (string) $this->request->getPost('description'),
 
             'image' =>
-                $imagePath,
+                null,
 
             'date_start' =>
-                $this->request->getPost('date_start'),
+                $dateStart,
 
             'date_end' =>
-                $this->request->getPost('date_end'),
+                $this->request->getPost('date_end')
+                    ?: null,
 
             'time_start' =>
-                $this->request->getPost('time_start'),
+                $this->request->getPost('time_start')
+                    ?: null,
 
             'time_end' =>
-                $this->request->getPost('time_end'),
+                $this->request->getPost('time_end')
+                    ?: null,
 
             'location_name' =>
-                trim($this->request->getPost('location_name')),
+                $locationName,
 
             'address' =>
-                $this->request->getPost('address'),
+                (string) $this->request->getPost('address'),
 
             'latitude' =>
-                $this->request->getPost('latitude'),
+                $this->request->getPost('latitude')
+                    ?: null,
 
             'longitude' =>
-                $this->request->getPost('longitude'),
+                $this->request->getPost('longitude')
+                    ?: null,
 
             'price' =>
                 $this->request->getPost('price') !== ''
@@ -222,16 +325,28 @@ class Events extends BaseController
                     : 0,
 
             'registration_url' =>
-                trim($this->request->getPost('registration_url')),
+                trim(
+                    (string) $this->request->getPost(
+                        'registration_url'
+                    )
+                ),
 
             'organizer_name' =>
-                trim($this->request->getPost('organizer_name')),
+                trim(
+                    (string) $this->request->getPost(
+                        'organizer_name'
+                    )
+                ),
 
             'organizer_contact' =>
-                trim($this->request->getPost('organizer_contact')),
+                trim(
+                    (string) $this->request->getPost(
+                        'organizer_contact'
+                    )
+                ),
 
             'status' =>
-                $this->request->getPost('status') ?: 'draft',
+                $status,
 
             'is_partner' =>
                 $this->request->getPost('is_partner')
@@ -240,11 +355,172 @@ class Events extends BaseController
         ];
 
 
-        $this->eventModel->insert($data);
+        // =========================
+        // UPLOAD GAMBAR
+        // =========================
 
+        if (
+            $image &&
+            $image->getError() !== UPLOAD_ERR_NO_FILE &&
+            $image->isValid() &&
+            !$image->hasMoved()
+        ) {
+
+            $uploadPath =
+                FCPATH . 'uploads/events/';
+
+
+            if (!is_dir($uploadPath)) {
+
+                if (!mkdir(
+                    $uploadPath,
+                    0777,
+                    true
+                )) {
+
+                    return redirect()
+                        ->to(
+                            site_url(
+                                'admin/events/create'
+                            )
+                        )
+                        ->withInput()
+                        ->with(
+                            'errors',
+                            [
+                                'image' =>
+                                    'Folder upload gambar tidak dapat dibuat.'
+                            ]
+                        );
+                }
+            }
+
+
+            $newName =
+                $image->getRandomName();
+
+
+            try {
+
+                $image->move(
+                    $uploadPath,
+                    $newName
+                );
+
+            } catch (\Throwable $e) {
+
+                return redirect()
+                    ->to(
+                        site_url(
+                            'admin/events/create'
+                        )
+                    )
+                    ->withInput()
+                    ->with(
+                        'errors',
+                        [
+                            'image' =>
+                                'Gambar gagal diupload: ' .
+                                $e->getMessage()
+                        ]
+                    );
+            }
+
+
+            $data['image'] =
+                'uploads/events/' . $newName;
+        }
+
+
+        // =========================
+        // INSERT DATABASE
+        // =========================
+
+        try {
+
+            $inserted =
+                $this->eventModel->insert(
+                    $data
+                );
+
+        } catch (\Throwable $e) {
+
+            // Kalau database gagal,
+            // hapus gambar yang baru saja diupload.
+
+            if (!empty($data['image'])) {
+
+                $uploadedImage =
+                    FCPATH . $data['image'];
+
+                if (is_file($uploadedImage)) {
+                    unlink($uploadedImage);
+                }
+            }
+
+
+            return redirect()
+                ->to(
+                    site_url(
+                        'admin/events/create'
+                    )
+                )
+                ->withInput()
+                ->with(
+                    'errors',
+                    [
+                        'database' =>
+                            'Event gagal disimpan: ' .
+                            $e->getMessage()
+                    ]
+                );
+        }
+
+
+        // =========================
+        // CEK HASIL INSERT
+        // =========================
+
+        if (!$inserted) {
+
+            if (!empty($data['image'])) {
+
+                $uploadedImage =
+                    FCPATH . $data['image'];
+
+                if (is_file($uploadedImage)) {
+                    unlink($uploadedImage);
+                }
+            }
+
+
+            return redirect()
+                ->to(
+                    site_url(
+                        'admin/events/create'
+                    )
+                )
+                ->withInput()
+                ->with(
+                    'errors',
+                    [
+                        'database' =>
+                            'Event tidak berhasil disimpan ke database.'
+                    ]
+                );
+        }
+
+
+        // =========================
+        // BERHASIL
+        // =========================
 
         return redirect()
-            ->to('/admin/events')
+            ->to(
+                site_url(
+                    'admin/events'
+                )
+            )
             ->with(
                 'success',
                 'Event berhasil ditambahkan.'
@@ -262,7 +538,8 @@ class Events extends BaseController
         }
 
 
-        $event = $this->eventModel->find($id);
+        $event =
+            $this->eventModel->find($id);
 
 
         if (!$event) {
@@ -273,9 +550,12 @@ class Events extends BaseController
         }
 
 
-        return view('admin/events/edit', [
-            'event' => $event
-        ]);
+        return view(
+            'admin/events/edit',
+            [
+                'event' => $event
+            ]
+        );
     }
 
 
@@ -289,7 +569,8 @@ class Events extends BaseController
         }
 
 
-        $event = $this->eventModel->find($id);
+        $event =
+            $this->eventModel->find($id);
 
 
         if (!$event) {
@@ -304,12 +585,14 @@ class Events extends BaseController
 
             'category_id' => [
                 'label' => 'Kategori Event',
-                'rules' => 'required|in_list[1,2,3,4,5,6,7,8,16]'
+                'rules' =>
+                    'required|in_list[1,2,3,4,5,6,7,8,16]'
             ],
 
             'title' => [
                 'label' => 'Judul Event',
-                'rules' => 'required|max_length[255]'
+                'rules' =>
+                    'required|max_length[255]'
             ],
 
             'slug' => [
@@ -320,12 +603,14 @@ class Events extends BaseController
 
             'date_start' => [
                 'label' => 'Tanggal Mulai',
-                'rules' => 'required'
+                'rules' =>
+                    'required'
             ],
 
             'location_name' => [
                 'label' => 'Lokasi',
-                'rules' => 'required|max_length[255]'
+                'rules' =>
+                    'required|max_length[255]'
             ],
 
             'image' => [
@@ -354,49 +639,73 @@ class Events extends BaseController
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | DATA EVENT
-        |--------------------------------------------------------------------------
-        */
-
         $data = [
 
             'category_id' =>
-                (int) $this->request->getPost('category_id'),
+                (int) $this->request->getPost(
+                    'category_id'
+                ),
 
             'title' =>
-                trim($this->request->getPost('title')),
+                trim(
+                    (string) $this->request->getPost(
+                        'title'
+                    )
+                ),
 
             'slug' =>
-                trim($this->request->getPost('slug')),
+                trim(
+                    (string) $this->request->getPost(
+                        'slug'
+                    )
+                ),
 
             'description' =>
-                $this->request->getPost('description'),
+                $this->request->getPost(
+                    'description'
+                ),
 
             'date_start' =>
-                $this->request->getPost('date_start'),
+                $this->request->getPost(
+                    'date_start'
+                ),
 
             'date_end' =>
-                $this->request->getPost('date_end'),
+                $this->request->getPost(
+                    'date_end'
+                ) ?: null,
 
             'time_start' =>
-                $this->request->getPost('time_start'),
+                $this->request->getPost(
+                    'time_start'
+                ) ?: null,
 
             'time_end' =>
-                $this->request->getPost('time_end'),
+                $this->request->getPost(
+                    'time_end'
+                ) ?: null,
 
             'location_name' =>
-                trim($this->request->getPost('location_name')),
+                trim(
+                    (string) $this->request->getPost(
+                        'location_name'
+                    )
+                ),
 
             'address' =>
-                $this->request->getPost('address'),
+                $this->request->getPost(
+                    'address'
+                ),
 
             'latitude' =>
-                $this->request->getPost('latitude'),
+                $this->request->getPost(
+                    'latitude'
+                ) ?: null,
 
             'longitude' =>
-                $this->request->getPost('longitude'),
+                $this->request->getPost(
+                    'longitude'
+                ) ?: null,
 
             'price' =>
                 $this->request->getPost('price') !== ''
@@ -404,16 +713,29 @@ class Events extends BaseController
                     : 0,
 
             'registration_url' =>
-                trim($this->request->getPost('registration_url')),
+                trim(
+                    (string) $this->request->getPost(
+                        'registration_url'
+                    )
+                ),
 
             'organizer_name' =>
-                trim($this->request->getPost('organizer_name')),
+                trim(
+                    (string) $this->request->getPost(
+                        'organizer_name'
+                    )
+                ),
 
             'organizer_contact' =>
-                trim($this->request->getPost('organizer_contact')),
+                trim(
+                    (string) $this->request->getPost(
+                        'organizer_contact'
+                    )
+                ),
 
             'status' =>
-                $this->request->getPost('status') ?: 'draft',
+                $this->request->getPost('status')
+                    ?: 'draft',
 
             'is_partner' =>
                 $this->request->getPost('is_partner')
@@ -422,13 +744,12 @@ class Events extends BaseController
         ];
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | UPLOAD GAMBAR BARU
-        |--------------------------------------------------------------------------
-        */
+        // =========================
+        // UPLOAD GAMBAR BARU
+        // =========================
 
-        $image = $this->request->getFile('image');
+        $image =
+            $this->request->getFile('image');
 
 
         if (
@@ -442,7 +763,11 @@ class Events extends BaseController
 
 
             if (!is_dir($uploadPath)) {
-                mkdir($uploadPath, 0777, true);
+                mkdir(
+                    $uploadPath,
+                    0777,
+                    true
+                );
             }
 
 
@@ -450,27 +775,38 @@ class Events extends BaseController
                 $image->getRandomName();
 
 
-            $image->move(
-                $uploadPath,
-                $newName
-            );
+            try {
+
+                $image->move(
+                    $uploadPath,
+                    $newName
+                );
+
+            } catch (\Throwable $e) {
+
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->with(
+                        'errors',
+                        [
+                            'image' =>
+                                'Gambar gagal diupload: ' .
+                                $e->getMessage()
+                        ]
+                    );
+            }
 
 
             $data['image'] =
                 'uploads/events/' . $newName;
 
 
-            /*
-            |--------------------------------------------------------------------------
-            | HAPUS GAMBAR LAMA
-            |--------------------------------------------------------------------------
-            */
-
+            // Hapus gambar lama
             if (!empty($event['image'])) {
 
                 $oldImage =
                     FCPATH . $event['image'];
-
 
                 if (is_file($oldImage)) {
                     unlink($oldImage);
@@ -479,14 +815,55 @@ class Events extends BaseController
         }
 
 
-        $this->eventModel->update(
-            $id,
-            $data
-        );
+        // =========================
+        // UPDATE
+        // =========================
+
+        try {
+
+            $updated =
+                $this->eventModel->update(
+                    $id,
+                    $data
+                );
+
+        } catch (\Throwable $e) {
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with(
+                    'errors',
+                    [
+                        'database' =>
+                            'Event gagal diperbarui: ' .
+                            $e->getMessage()
+                    ]
+                );
+        }
+
+
+        if (!$updated) {
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with(
+                    'errors',
+                    [
+                        'database' =>
+                            'Event tidak berhasil diperbarui.'
+                    ]
+                );
+        }
 
 
         return redirect()
-            ->to('/admin/events')
+            ->to(
+                site_url(
+                    'admin/events'
+                )
+            )
             ->with(
                 'success',
                 'Event berhasil diperbarui.'
@@ -511,7 +888,11 @@ class Events extends BaseController
         if (!$event) {
 
             return redirect()
-                ->to('/admin/events')
+                ->to(
+                    site_url(
+                        'admin/events'
+                    )
+                )
                 ->with(
                     'error',
                     'Event tidak ditemukan.'
@@ -519,17 +900,11 @@ class Events extends BaseController
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | HAPUS GAMBAR
-        |--------------------------------------------------------------------------
-        */
-
+        // Hapus gambar
         if (!empty($event['image'])) {
 
             $imagePath =
                 FCPATH . $event['image'];
-
 
             if (is_file($imagePath)) {
                 unlink($imagePath);
@@ -537,17 +912,16 @@ class Events extends BaseController
         }
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | HAPUS EVENT
-        |--------------------------------------------------------------------------
-        */
-
+        // Hapus event
         $this->eventModel->delete($id);
 
 
         return redirect()
-            ->to('/admin/events')
+            ->to(
+                site_url(
+                    'admin/events'
+                )
+            )
             ->with(
                 'success',
                 'Event berhasil dihapus.'
