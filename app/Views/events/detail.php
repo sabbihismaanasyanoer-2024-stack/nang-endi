@@ -42,10 +42,6 @@
         }
 
 
-        /* =========================
-           NAVBAR
-        ========================= */
-
         nav {
             min-height: 80px;
 
@@ -90,10 +86,6 @@
         }
 
 
-        /* =========================
-           DETAIL
-        ========================= */
-
         .detail {
             padding: 65px 7% 100px;
         }
@@ -114,10 +106,6 @@
         }
 
 
-        /* =========================
-           MAIN LAYOUT
-        ========================= */
-
         .layout {
             display: grid;
 
@@ -130,10 +118,6 @@
             align-items: start;
         }
 
-
-        /* =========================
-           IMAGE
-        ========================= */
 
         .image {
             width: 100%;
@@ -170,10 +154,6 @@
         }
 
 
-        /* =========================
-           EVENT CONTENT
-        ========================= */
-
         .tag {
             margin-bottom: 20px;
 
@@ -204,10 +184,6 @@
             letter-spacing: -5px;
         }
 
-
-        /* =========================
-           INFO
-        ========================= */
 
         .info {
             padding: 25px 0;
@@ -264,10 +240,6 @@
         }
 
 
-        /* =========================
-           DESCRIPTION
-        ========================= */
-
         .description {
             margin-bottom: 35px;
 
@@ -276,10 +248,6 @@
             line-height: 1.75;
         }
 
-
-        /* =========================
-           TICKET AREA
-        ========================= */
 
         .ticket-area {
             margin-top: 30px;
@@ -375,10 +343,6 @@
         }
 
 
-        /* =========================
-           LOCATION BUTTON
-        ========================= */
-
         .location-button {
             width: 100%;
 
@@ -417,10 +381,6 @@
         }
 
 
-        /* =========================
-           FOOTER
-        ========================= */
-
         footer {
             padding: 60px 7%;
 
@@ -441,10 +401,6 @@
             font-size: 14px;
         }
 
-
-        /* =========================
-           TABLET / MOBILE
-        ========================= */
 
         @media (max-width: 900px) {
 
@@ -573,10 +529,6 @@
 <body>
 
 
-<!-- =========================
-     NAVBAR
-========================= -->
-
 <nav>
 
     <a
@@ -610,11 +562,6 @@
 </nav>
 
 
-
-<!-- =========================
-     EVENT DETAIL
-========================= -->
-
 <main class="detail">
 
 
@@ -626,28 +573,49 @@
     </a>
 
 
-
     <div class="layout">
 
 
-        <!-- =========================
-             IMAGE
-        ========================= -->
+        <!-- IMAGE -->
 
         <div class="image">
 
+            <?php
+                $imagePath = trim($event['image'] ?? '');
 
-            <?php if (!empty($event['image'])): ?>
+                $imagePath = str_replace(
+                    '\\',
+                    '/',
+                    $imagePath
+                );
+
+                $imagePath = preg_replace(
+                    '#^public/#i',
+                    '',
+                    $imagePath
+                );
+
+                $imagePath = ltrim(
+                    $imagePath,
+                    '/'
+                );
+
+                $imageUrl = '';
+
+                if ($imagePath !== '') {
+                    $imageUrl = base_url($imagePath);
+                }
+            ?>
+
+
+            <?php if ($imageUrl !== ''): ?>
 
                 <img
-                    src="<?= base_url(
-                        $event['image']
-                    ) ?>"
-                    alt="<?= esc(
-                        $event['title']
-                    ) ?>"
+                    src="<?= esc($imageUrl) ?>"
+                    alt="<?= esc($event['title'] ?? 'Event') ?>"
+                    loading="eager"
+                    onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\'image-placeholder\'>🎪</div>';"
                 >
-
 
             <?php else: ?>
 
@@ -657,14 +625,10 @@
 
             <?php endif; ?>
 
-
         </div>
 
 
-
-        <!-- =========================
-             CONTENT
-        ========================= -->
+        <!-- CONTENT -->
 
         <div>
 
@@ -675,21 +639,12 @@
 
 
             <h1>
-                <?= esc(
-                    $event['title']
-                ) ?>
+                <?= esc($event['title']) ?>
             </h1>
 
 
-
-            <!-- =========================
-                 EVENT INFO
-            ========================= -->
-
             <div class="info">
 
-
-                <!-- DATE -->
 
                 <div class="info-row">
 
@@ -700,20 +655,12 @@
 
                     <span class="info-text">
 
-
-                        <?php if (
-                            !empty(
-                                $event['date_start']
-                            )
-                        ): ?>
+                        <?php if (!empty($event['date_start'])): ?>
 
                             <?= date(
                                 'd M Y',
-                                strtotime(
-                                    $event['date_start']
-                                )
+                                strtotime($event['date_start'])
                             ) ?>
-
 
                         <?php else: ?>
 
@@ -722,31 +669,21 @@
                         <?php endif; ?>
 
 
-                        <?php if (
-                            !empty(
-                                $event['date_end']
-                            )
-                        ): ?>
+                        <?php if (!empty($event['date_end'])): ?>
 
                             —
 
                             <?= date(
                                 'd M Y',
-                                strtotime(
-                                    $event['date_end']
-                                )
+                                strtotime($event['date_end'])
                             ) ?>
 
                         <?php endif; ?>
-
 
                     </span>
 
                 </div>
 
-
-
-                <!-- TIME -->
 
                 <div class="info-row">
 
@@ -757,18 +694,11 @@
 
                     <span class="info-text">
 
-
-                        <?php if (
-                            !empty(
-                                $event['time_start']
-                            )
-                        ): ?>
+                        <?php if (!empty($event['time_start'])): ?>
 
                             <?= date(
                                 'H:i',
-                                strtotime(
-                                    $event['time_start']
-                                )
+                                strtotime($event['time_start'])
                             ) ?>
 
                         <?php else: ?>
@@ -778,31 +708,21 @@
                         <?php endif; ?>
 
 
-                        <?php if (
-                            !empty(
-                                $event['time_end']
-                            )
-                        ): ?>
+                        <?php if (!empty($event['time_end'])): ?>
 
                             —
 
                             <?= date(
                                 'H:i',
-                                strtotime(
-                                    $event['time_end']
-                                )
+                                strtotime($event['time_end'])
                             ) ?>
 
                         <?php endif; ?>
-
 
                     </span>
 
                 </div>
 
-
-
-                <!-- LOCATION -->
 
                 <div class="info-row">
 
@@ -814,16 +734,11 @@
                     <span class="info-text">
 
                         <?= esc(
-                            $event['location_name']
-                            ?? '-'
+                            $event['location_name'] ?? '-'
                         ) ?>
 
 
-                        <?php if (
-                            !empty(
-                                $event['address']
-                            )
-                        ): ?>
+                        <?php if (!empty($event['address'])): ?>
 
                             <br>
 
@@ -833,14 +748,10 @@
 
                         <?php endif; ?>
 
-
                     </span>
 
                 </div>
 
-
-
-                <!-- PRICE -->
 
                 <div class="info-row">
 
@@ -851,21 +762,16 @@
 
                     <span class="info-text">
 
-
                         <?php
 
-                            $price =
-                                (float) (
-                                    $event['price']
-                                    ?? 0
-                                );
+                            $price = (float) (
+                                $event['price'] ?? 0
+                            );
 
                         ?>
 
 
-                        <?php if (
-                            $price <= 0
-                        ): ?>
+                        <?php if ($price <= 0): ?>
 
                             FREE
 
@@ -881,21 +787,12 @@
 
                         <?php endif; ?>
 
-
                     </span>
 
                 </div>
 
 
-
-                <!-- ORGANIZER -->
-
-                <?php if (
-                    !empty(
-                        $event['organizer_name']
-                    )
-                ): ?>
-
+                <?php if (!empty($event['organizer_name'])): ?>
 
                     <div class="info-row">
 
@@ -907,15 +804,12 @@
                         <span class="info-text">
 
                             <?= esc(
-                                $event[
-                                    'organizer_name'
-                                ]
+                                $event['organizer_name']
                             ) ?>
 
                         </span>
 
                     </div>
-
 
                 <?php endif; ?>
 
@@ -923,17 +817,7 @@
             </div>
 
 
-
-            <!-- =========================
-                 DESCRIPTION
-            ========================= -->
-
-            <?php if (
-                !empty(
-                    $event['description']
-                )
-            ): ?>
-
+            <?php if (!empty($event['description'])): ?>
 
                 <div class="description">
 
@@ -945,14 +829,8 @@
 
                 </div>
 
-
             <?php endif; ?>
 
-
-
-            <!-- =========================
-                 TICKET
-            ========================= -->
 
             <?php
 
@@ -976,9 +854,8 @@
 
                 $externalTicketUrl =
                     trim(
-                        $event[
-                            'registration_url'
-                        ] ?? ''
+                        $event['registration_url']
+                        ?? ''
                     );
 
             ?>
@@ -994,9 +871,6 @@
 
                 <?php if ($isFree): ?>
 
-
-                    <!-- FREE EVENT -->
-
                     <div class="free-button">
                         FREE EVENT
                     </div>
@@ -1009,9 +883,6 @@
 
 
                 <?php elseif ($isPartner): ?>
-
-
-                    <!-- NANG ENDI PARTNER -->
 
                     <a
                         href="<?= base_url(
@@ -1030,14 +901,7 @@
                     </div>
 
 
-                <?php elseif (
-                    !empty(
-                        $externalTicketUrl
-                    )
-                ): ?>
-
-
-                    <!-- EXTERNAL TICKET -->
+                <?php elseif (!empty($externalTicketUrl)): ?>
 
                     <a
                         href="<?= esc(
@@ -1059,9 +923,6 @@
 
                 <?php else: ?>
 
-
-                    <!-- NO TICKET INFO -->
-
                     <div class="ticket-info-button">
                         INFO TIKET BELUM TERSEDIA
                     </div>
@@ -1072,28 +933,20 @@
                         belum tersedia.
                     </div>
 
-
                 <?php endif; ?>
 
 
             </div>
 
 
-
-            <!-- =========================
-                 LOCATION
-            ========================= -->
-
             <?php
 
                 $latitude =
-                    $event['latitude']
-                    ?? '';
+                    $event['latitude'] ?? '';
 
 
                 $longitude =
-                    $event['longitude']
-                    ?? '';
+                    $event['longitude'] ?? '';
 
             ?>
 
@@ -1109,18 +962,14 @@
                     $mapUrl =
                         'https://www.google.com/maps/search/?api=1&query=' .
                         rawurlencode(
-                            $latitude .
-                            ',' .
-                            $longitude
+                            $latitude . ',' . $longitude
                         );
 
                 ?>
 
 
                 <a
-                    href="<?= esc(
-                        $mapUrl
-                    ) ?>"
+                    href="<?= esc($mapUrl) ?>"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="location-button"
@@ -1140,11 +989,6 @@
 
 </main>
 
-
-
-<!-- =========================
-     FOOTER
-========================= -->
 
 <footer>
 
