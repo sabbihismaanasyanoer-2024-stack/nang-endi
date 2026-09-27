@@ -13,7 +13,23 @@ class Events extends BaseController
         $events = $eventModel
             ->where('status', 'published')
             ->orderBy('date_start', 'ASC')
+            ->orderBy('time_start', 'ASC')
             ->findAll();
+
+        // Pastikan data image tetap tersedia dan format path konsisten
+        foreach ($events as &$event) {
+            $image = trim($event['image'] ?? '');
+
+            if ($image !== '') {
+                $image = str_replace('\\', '/', $image);
+                $image = preg_replace('#^/+?#', '', $image);
+                $image = preg_replace('#^public/#i', '', $image);
+            }
+
+            $event['image'] = $image;
+        }
+
+        unset($event);
 
         return view('events/index', [
             'events' => $events
@@ -34,6 +50,17 @@ class Events extends BaseController
                 'Event tidak ditemukan.'
             );
         }
+
+        // Normalisasi path gambar untuk halaman detail
+        $image = trim($event['image'] ?? '');
+
+        if ($image !== '') {
+            $image = str_replace('\\', '/', $image);
+            $image = preg_replace('#^/+?#', '', $image);
+            $image = preg_replace('#^public/#i', '', $image);
+        }
+
+        $event['image'] = $image;
 
         return view('events/detail', [
             'event' => $event
