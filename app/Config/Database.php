@@ -26,10 +26,10 @@ class Database extends Config
      */
     public array $default = [
         'DSN'          => '',
-        'hostname'     => 'localhost',
-        'username'     => 'root',
+        'hostname'     => '',
+        'username'     => '',
         'password'     => '',
-        'database'     => 'nang_endi',
+        'database'     => '',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
         'pConnect'     => false,
@@ -117,8 +117,8 @@ class Database extends Config
     //        'pConnect'   => false,
     //        'DBDebug'    => true,
     //        'charset'    => 'utf8',
+    //        'DBPrefix'   => '',
     //        'swapPre'    => '',
-    //        'encrypt'    => false,
     //        'failover'   => [],
     //        'port'       => 1433,
     //        'dateFormat' => [
@@ -135,7 +135,7 @@ class Database extends Config
     //     *   NLS_LANG                = 'AMERICAN_AMERICA.UTF8'
     //     *   NLS_DATE_FORMAT         = 'YYYY-MM-DD HH24:MI:SS'
     //     *   NLS_TIMESTAMP_FORMAT    = 'YYYY-MM-DD HH24:MI:SS'
-    //     *   NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS'
+    //   *   NLS_TIMESTAMP_TZ_FORMAT = 'YYYY-MM-DD HH24:MI:SS'
     //     *
     //     * @var array<string, mixed>
     //     */
@@ -148,7 +148,6 @@ class Database extends Config
     //        'pConnect'   => false,
     //        'DBDebug'    => true,
     //        'charset'    => 'AL32UTF8',
-    //        'swapPre'    => '',
     //        'failover'   => [],
     //        'dateFormat' => [
     //            'date'     => 'Y-m-d',
@@ -169,7 +168,7 @@ class Database extends Config
         'password'    => '',
         'database'    => ':memory:',
         'DBDriver'    => 'SQLite3',
-        'DBPrefix'    => 'db_',  // Needed to ensure we're working correctly with prefixes live. DO NOT REMOVE FOR CI DEVS
+        'DBPrefix'    => 'db_',
         'pConnect'    => false,
         'DBDebug'     => true,
         'charset'     => 'utf8',
@@ -194,9 +193,12 @@ class Database extends Config
     {
         parent::__construct();
 
-        // Ensure that we always set the database group to 'tests' if
-        // we are currently running an automated test suite, so that
-        // we don't overwrite live data on accident.
+        $this->default['hostname'] = getenv('DB_HOST') ?: 'localhost';
+        $this->default['username'] = getenv('DB_USER') ?: 'root';
+        $this->default['password'] = getenv('DB_PASSWORD') ?: '';
+        $this->default['database'] = getenv('DB_NAME') ?: 'nang_endi';
+        $this->default['port']     = (int) (getenv('DB_PORT') ?: 3306);
+
         if (ENVIRONMENT === 'testing') {
             $this->defaultGroup = 'tests';
         }
