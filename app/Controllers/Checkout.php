@@ -1,3 +1,4 @@
+```php
 <?php
 
 namespace App\Controllers;
@@ -100,7 +101,7 @@ class Checkout extends BaseController
 
 
         // =========================
-        // EVENT
+        // AMBIL EVENT
         // =========================
 
         $eventModel = new EventModel();
@@ -157,11 +158,19 @@ class Checkout extends BaseController
             'order_status'    => 'waiting_payment',
         ];
 
-        $orderModel->insert($orderData);
+        try {
+            $inserted = $orderModel->insert($orderData);
+        } catch (\Throwable $e) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Pesanan gagal dibuat: ' . $e->getMessage()
+                );
+        }
 
-        $orderId = $orderModel->getInsertID();
-
-        if (!$orderId) {
+        if (!$inserted) {
             return redirect()
                 ->back()
                 ->withInput()
@@ -171,132 +180,50 @@ class Checkout extends BaseController
                 );
         }
 
+        $orderId = $orderModel->getInsertID();
 
-        // =========================
-        // SESSION
-        // =========================
-
-        $order = [
-            'id'             => $orderId,
-            'order_code'     => $orderCode,
-            'event_id'       => $event['id'],
-            'event_title'    => $event['title'],
-            'event_slug'     => $event['slug'],
-            'name'           => $name,
-            'email'          => $email,
-            'phone'          => $phone,
-            'quantity'       => $quantity,
-            'price'          => $price,
-            'total'          => $total,
-            'payment_method' => $paymentMethod,
-            'status'         => 'waiting_payment',
-            'created_at'     => date('Y-m-d H:i:s'),
-        ];
-
-        session()->set(
-            'ticket_order',
-            $order
-        );
-
-
-        return redirect()->to(
-            base_url('checkout/payment')
-        );
-    }
-
-
-    /**
-     * Halaman pembayaran.
-     */
-    public function payment()
-    {
-        $order = session()->get('ticket_order');
-
-        if (!$order) {
-            return redirect()->to(
-                base_url('events')
-            );
+        if (!$orderId) {
+            return redirect()
+                ->back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Kode pemesanan gagal dibuat.'
+                );
         }
-
-        return view('checkout/payment', [
-            'order' => $order
-        ]);
-    }
-
-
-    /**
-     * Konfirmasi pembayaran.
-     *
-     * Setelah pembayaran dikonfirmasi,
-     * redirect menggunakan order_code.
-     *
-     * Jadi halaman E-Ticket tidak bergantung
-     * pada session.
-     */
-    public function confirmPayment()
-    {
-        $order = session()->get('ticket_order');
-
-        if (!$order || empty($order['id'])) {
-            return redirect()->to(
-                base_url('events')
-            );
-        }
-
-
-        $orderModel = new OrderModel();
-
-        $orderModel->update(
-            $order['id'],
-            [
-                'payment_status' => 'paid',
-                'order_status'   => 'paid'
-            ]
-        );
-
-
-        $order['status'] = 'paid';
-
-        $order['paid_at'] = date(
-            'Y-m-d H:i:s'
-        );
-
-        session()->set(
-            'ticket_order',
-            $order
-        );
 
 
         /*
-         * Jangan redirect hanya ke /checkout/success.
+         * PENTING:
+         * Payment tidak bergantung pada session.
          *
-         * Kirim order_code supaya halaman success
-         * bisa mengambil data langsung dari database.
+         * Order code dikirim langsung melalui URL.
          */
         return redirect()->to(
             base_url(
-                'checkout/success?order=' .
-                urlencode($order['order_code'])
+                'checkout/payment?order=' .
+                urlencode($orderCode)
             )
         );
     }
 
 
     /**
-     * Halaman E-Ticket.
-     *
-     * Order diambil dari database menggunakan
-     * order_code, bukan hanya session.
+     * Halaman pembayaran / QRIS.
      */
-    public function success()
+    public function payment()
     {
+        /*
+         * Ambil order code dari URL.
+         */
         $orderCode = trim(
             (string) $this->request->getGet('order')
         );
 
 
-        // Fallback jika user membuka halaman
-        // dari session yang masih tersedia.
+        /*
+         * Fallback session jika masih tersedia.
+         */
         if ($orderCode === '') {
             $sessionOrder = session()->get('ticket_order');
 
@@ -305,30 +232,33 @@ class Checkout extends BaseController
             }
         }
 
-
         if ($orderCode === '') {
-            return redirect()->to(
-                base_url('events')
-            );
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Kode pemesanan tidak ditemukan.'
+                );
         }
 
 
         // =========================
-        // AMBIL ORDER DATABASE
+        // AMBIL ORDER
         // =========================
 
         $orderModel = new OrderModel();
 
         $dbOrder = $orderModel
             ->where('order_code', $orderCode)
-            ->where('payment_status', 'paid')
             ->first();
 
-
         if (!$dbOrder) {
-            return redirect()->to(
-                base_url('events')
-            );
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Pesanan tidak ditemukan.'
+                );
         }
 
 
@@ -342,11 +272,13 @@ class Checkout extends BaseController
             ->where('id', $dbOrder['event_id'])
             ->first();
 
-
         if (!$event) {
-            return redirect()->to(
-                base_url('events')
-            );
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Event untuk pesanan tidak ditemukan.'
+                );
         }
 
 
@@ -354,9 +286,9 @@ class Checkout extends BaseController
         // JUMLAH TIKET
         // =========================
 
-        $quantity = 1;
-
         $price = (float) ($event['price'] ?? 0);
+
+        $quantity = 1;
 
         if ($price > 0) {
             $calculatedQuantity =
@@ -371,7 +303,7 @@ class Checkout extends BaseController
 
 
         // =========================
-        // DATA UNTUK E-TICKET
+        // DATA ORDER
         // =========================
 
         $order = [
@@ -387,22 +319,193 @@ class Checkout extends BaseController
             'price'          => $price,
             'total'          => (float) $dbOrder['total_amount'],
             'payment_method' => $dbOrder['payment_method'],
-            'status'         => 'paid',
-            'paid_at'        => $dbOrder['updated_at'] ?? date('Y-m-d H:i:s'),
+            'status'         => $dbOrder['payment_status'],
             'created_at'     => $dbOrder['created_at'],
         ];
 
 
-        // Simpan kembali sebagai convenience,
-        // tetapi halaman tidak bergantung pada session.
+        /*
+         * Session hanya sebagai backup.
+         */
         session()->set(
             'ticket_order',
             $order
         );
 
 
-        return view('checkout/success', [
+        return view('checkout/payment', [
             'order' => $order
         ]);
     }
-}
+
+
+    /**
+     * Konfirmasi pembayaran.
+     */
+    public function confirmPayment()
+    {
+        /*
+         * Ambil order code dari POST.
+         */
+        $orderCode = trim(
+            (string) $this->request->getPost('order')
+        );
+
+        /*
+         * Fallback GET.
+         */
+        if ($orderCode === '') {
+            $orderCode = trim(
+                (string) $this->request->getGet('order')
+            );
+        }
+
+        /*
+         * Fallback session.
+         */
+        if ($orderCode === '') {
+            $sessionOrder = session()->get('ticket_order');
+
+            if (!empty($sessionOrder['order_code'])) {
+                $orderCode = $sessionOrder['order_code'];
+            }
+        }
+
+        if ($orderCode === '') {
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Kode pemesanan tidak ditemukan.'
+                );
+        }
+
+
+        // =========================
+        // CARI ORDER
+        // =========================
+
+        $orderModel = new OrderModel();
+
+        $order = $orderModel
+            ->where('order_code', $orderCode)
+            ->first();
+
+        if (!$order) {
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Pesanan tidak ditemukan.'
+                );
+        }
+
+
+        // =========================
+        // UPDATE STATUS
+        // =========================
+
+        try {
+            $updated = $orderModel->update(
+                $order['id'],
+                [
+                    'payment_status' => 'paid',
+                    'order_status'   => 'paid'
+                ]
+            );
+        } catch (\Throwable $e) {
+            return redirect()
+                ->back()
+                ->with(
+                    'error',
+                    'Pembayaran gagal dikonfirmasi: ' .
+                    $e->getMessage()
+                );
+        }
+
+        if (!$updated) {
+            return redirect()
+                ->back()
+                ->with(
+                    'error',
+                    'Status pembayaran gagal diperbarui.'
+                );
+        }
+
+
+        /*
+         * Redirect menggunakan order code.
+         */
+        return redirect()->to(
+            base_url(
+                'checkout/success?order=' .
+                urlencode($orderCode)
+            )
+        );
+    }
+
+
+    /**
+     * Halaman E-Ticket.
+     */
+    public function success()
+    {
+        /*
+         * Ambil order code dari URL.
+         */
+        $orderCode = trim(
+            (string) $this->request->getGet('order')
+        );
+
+
+        /*
+         * Fallback session.
+         */
+        if ($orderCode === '') {
+            $sessionOrder = session()->get('ticket_order');
+
+            if (!empty($sessionOrder['order_code'])) {
+                $orderCode = $sessionOrder['order_code'];
+            }
+        }
+
+        if ($orderCode === '') {
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Kode pemesanan tidak ditemukan.'
+                );
+        }
+
+
+        // =========================
+        // AMBIL ORDER
+        // =========================
+
+        $orderModel = new OrderModel();
+
+        $dbOrder = $orderModel
+            ->where('order_code', $orderCode)
+            ->where('payment_status', 'paid')
+            ->first();
+
+        if (!$dbOrder) {
+            return redirect()
+                ->to(base_url('events'))
+                ->with(
+                    'error',
+                    'Pembayaran belum ditemukan atau belum lunas.'
+                );
+        }
+
+
+        // =========================
+        // AMBIL EVENT
+        // =========================
+
+        $eventModel = new EventModel();
+
+        $event = $eventModel
+            ->where('id', $dbOrder['event_id'])
+            ->first();
